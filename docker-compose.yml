@@ -1,0 +1,174 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: smartdocflow-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: smartdocflow
+      MYSQL_USER: smartdoc
+      MYSQL_PASSWORD: smartdoc
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - smartdocflow-network
+
+  redis:
+    image: redis:7
+    container_name: smartdocflow-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - smartdocflow-network
+      
+  minio:
+    image: minio/minio
+    container_name: smartdocflow-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - smartdocflow-network
+      
+  ai-service:
+    build: ./ai-service
+    container_name: smartdocflow-ai
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TESSDATA_PREFIX: /usr/share/tesseract-ocr/5/tessdata
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      MINIO_BUCKET: smartdocflow-uploads
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - smartdocflow-network
+      
+  api-service:
+      build: ./api-service
+      container_name: smartdocflow-api
+      ports:
+        - "8080:8080"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        MYSQL_USER: smartdoc
+        MYSQL_PASSWORD: smartdoc
+        MINIO_URL: http://minio:9000
+        MINIO_ACCESS_KEY: minio
+        MINIO_SECRET_KEY: minio123
+        MINIO_BUCKET: smartdocflow-uploads
+        AI_SERVICE_URL: http://ai-service:8082
+        CONFIG_SERVICE_URL: http://config-service:8083
+      depends_on:
+        - mysql
+        - redis
+        - minio
+        - ai-service
+        - config-service
+      networks:
+        - smartdocflow-network
+        
+  worker-service:
+      build: ./worker-service
+      container_name: smartdocflow-worker
+      ports:
+        - "8081:8081"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        MYSQL_USER: smartdoc
+        MYSQL_PASSWORD: smartdoc
+        MINIO_URL: http://minio:9000
+        MINIO_ACCESS_KEY: minio
+        MINIO_SECRET_KEY: minio123
+        MINIO_BUCKET: smartdocflow-uploads
+        AI_SERVICE_URL: http://ai-service:8082
+        CONFIG_SERVICE_URL: http://config-service:8083
+        MAIL_HOST: smtp.gmail.com
+        MAIL_PORT: 587
+        MAIL_USERNAME: ${MAIL_USERNAME}
+        MAIL_PASSWORD: ${MAIL_PASSWORD}
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+      depends_on:
+        - mysql
+        - redis
+        - minio
+        - ai-service
+        - config-service
+      networks:
+        - smartdocflow-network
+        
+  config-service:
+      build: ./config-service
+      container_name: smartdocflow-config
+      ports:
+        - "8083:8083"
+      environment:
+        SPRING_PROFILES_ACTIVE: docker
+        MYSQL_USER: smartdoc
+        MYSQL_PASSWORD: smartdoc
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+      depends_on:
+        - mysql
+        - redis
+      networks:
+        - smartdocflow-network
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: smartdocflow-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - smartdocflow-network
+
+  grafana:
+      image: grafana/grafana:10.2.0
+      ports:
+        - "3000:3000"
+      environment:
+        - GF_AUTH_ANONYMOUS_ENABLED=true
+        - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      volumes:
+        - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/ds.yml
+      depends_on:
+        - loki
+      networks:
+        - smartdocflow-network
+        
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: smartdocflow-promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - smartdocflow-network
+
+
+networks:
+    smartdocflow-network:
+      driver: bridge
+
+volumes:
+  mysql_data:
+  minio_data:

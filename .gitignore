@@ -1,0 +1,25 @@
+# Java
+target/
+*.class
+
+# Gradle
+.gradle/
+build/
+
+# IntelliJ / VSCode
+.idea/
+.vscode/
+*.iml
+
+# Logs
+logs/
+*.log
+
+# Env files
+.env
+application-local.yml
+
+# macOS
+.DS_Store
+**/.DS_Store
+

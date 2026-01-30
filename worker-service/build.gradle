@@ -1,0 +1,49 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.1'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+bootJar {
+    enabled = true
+}
+
+jar {
+    enabled = false
+}
+
+group = 'com.smartdocflow'
+version = '1.0.0'
+sourceCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation group: 'com.sun.mail', name: 'jakarta.mail', version: '2.0.1'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // WebClient for calling other services
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    
+    // MySQL
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    // Jackson for JSON
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
